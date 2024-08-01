@@ -1,0 +1,248 @@
+#include <iostream>
+#include "SFML/Graphics.hpp"
+#include <SFML/Window/Mouse.hpp>
+#include <math.h>
+#include <stdio.h>
+using namespace std;
+
+// 🠗🠗🠗 this is what you can change 🠗🠗🠗
+
+// sensetivity parameters
+float sens = 1;
+float zoomSens = 10;
+
+// grid rendering parameters
+int ORIGCELLSIZE = 100;
+
+int ORIGLINESIZE = 3;
+float ORIGLINEBLURSTART = 1.5f;
+bool LINEBLUR = true;
+
+bool mouseDontMoveWhenMoving = false;
+bool hideMouseWhenMoving = false;
+
+// screen parameters
+int HEIGHT = 720;
+int WIDTH = 1280;
+
+// 🠕🠕🠕 this is what you can change 🠕🠕🠕
+
+// just dont touch please
+int CELLSIZE = ORIGCELLSIZE;
+int LINESIZE = ORIGLINESIZE;
+float LINEBLURSTART = ORIGLINEBLURSTART;
+int zoom = 0;
+int hH = HEIGHT / 2;
+int hW = WIDTH / 2;
+
+// vectors
+sf::Vector2f camPos(0, 0);
+sf::Vector2i lastPos(0, 0);
+
+// colors
+sf::Color bgColor = sf::Color::White;
+sf::Color lineColor = sf::Color(204, 204, 204);
+
+// functions
+bool isCellOnScreen(sf::Vector2i cellPos) {
+    return (((cellPos.x * CELLSIZE) <= camPos.x + hW + (CELLSIZE / 2) && (cellPos.x * CELLSIZE) >= camPos.x - hW - (CELLSIZE / 2)) && ((cellPos.y * CELLSIZE) <= camPos.y + hH + (CELLSIZE / 2) && (cellPos.y * CELLSIZE) >= camPos.y - hH - (CELLSIZE / 2)));
+}
+
+class Arrow {
+public:
+    int type = 0;
+    string name;
+    string activation;
+    string transmission;
+    int modId;
+    string icon_url;
+    bool clickable = false;
+    float customData[16];
+
+    void onClick();
+};
+
+int main() 
+{
+
+    // dont touch please
+
+    int amountOfLinesX = WIDTH / CELLSIZE + 2;
+    int amountOfLinesY = HEIGHT / CELLSIZE + 2;
+
+    amountOfLinesX = amountOfLinesX + (amountOfLinesX % 2);
+    amountOfLinesY = amountOfLinesY + (amountOfLinesY % 2);
+
+    int amountOfLinesXd = amountOfLinesX / 2;
+    int amountOfLinesYd = amountOfLinesY / 2;
+
+    int lineRenderStartRight = (hW)+(CELLSIZE / 2);
+    int lineRenderStartLeft = (hW)-(CELLSIZE / 2);
+    int lineRenderStartUp = (hH)+(CELLSIZE / 2);
+    int lineRenderStartDown = (hH)-(CELLSIZE / 2);
+
+    float blurSteps = LINESIZE - LINEBLURSTART;
+    float alphaStep = 255 / blurSteps;
+
+    sf::RenderWindow window(sf::VideoMode(WIDTH, HEIGHT), "Phantom");
+    sf::Event e;
+
+    while (window.isOpen()) {
+        while (window.pollEvent(e)) {
+            if (e.type == sf::Event::Closed) {
+                window.close();
+            }
+            if (e.type == sf::Event::MouseWheelScrolled)
+            {
+                if (e.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel) {
+                    zoom = min(max(zoom + (e.mouseWheelScroll.delta * zoomSens), -90.f), 240.f);
+
+                    CELLSIZE = ORIGCELLSIZE + zoom;
+                    if (zoom >= 0) {
+                        LINESIZE = ORIGLINESIZE * (zoom / 100.f + 1.f);
+                        if (LINEBLUR) {
+                            LINEBLURSTART = ORIGLINEBLURSTART * (zoom / 100.f + 1.f);
+                        }
+                    }
+                    else {
+                        LINESIZE = ORIGLINESIZE / (abs(zoom) / 100.f + 1.f);
+                        if (LINEBLUR) {
+                            LINEBLURSTART = ORIGLINEBLURSTART / (abs(zoom) / 100.f + 1.f);
+                        }
+                    }
+
+                    cout << LINESIZE << endl;
+
+                    lineRenderStartRight = (hW)+(CELLSIZE / 2);
+                    lineRenderStartLeft = (hW)-(CELLSIZE / 2);
+                    lineRenderStartUp = (hH)+(CELLSIZE / 2);
+                    lineRenderStartDown = (hH)-(CELLSIZE / 2);
+
+                    if (LINEBLUR) {
+                        blurSteps = LINESIZE - LINEBLURSTART;
+                        alphaStep = 255 / blurSteps;
+                    }
+
+                    amountOfLinesX = WIDTH / CELLSIZE + 2;
+                    amountOfLinesY = HEIGHT / CELLSIZE + 2;
+
+                    amountOfLinesX = amountOfLinesX + (amountOfLinesX % 2);
+                    amountOfLinesY = amountOfLinesY + (amountOfLinesY % 2);
+
+                    amountOfLinesXd = amountOfLinesX / 2;
+                    amountOfLinesYd = amountOfLinesY / 2;
+                }
+            }
+        }
+
+        sf::Vector2i position = sf::Mouse::getPosition(window);
+
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Middle) && window.hasFocus())
+        {
+            if (lastPos.x - position.x != 0 || lastPos.y - position.y != 0) {
+                camPos.x = camPos.x - ((lastPos.x - position.x) * sens / CELLSIZE);
+                camPos.y = camPos.y - ((lastPos.y - position.y) * sens / CELLSIZE);
+            }
+
+            if (mouseDontMoveWhenMoving) {
+                sf::Mouse::setPosition(sf::Vector2i(lastPos.x, lastPos.y), window);
+            }
+            else {
+                lastPos.x = position.x;
+                lastPos.y = position.y;
+            }
+            if (hideMouseWhenMoving) {
+                window.setMouseCursorVisible(false);
+            }
+
+        }
+        else {
+            lastPos.x = position.x;
+            lastPos.y = position.y;
+
+            if (hideMouseWhenMoving) {
+                window.setMouseCursorVisible(true);
+            }
+        }
+
+        window.clear(bgColor);
+
+        sf::VertexArray lines(sf::Lines, (amountOfLinesX + amountOfLinesYd) * 2);
+
+        for (int i = 0; i < amountOfLinesXd; i++) {
+            int pointRight = lineRenderStartRight + ((camPos.x - (int)camPos.x) * CELLSIZE) + (CELLSIZE * i);
+            int pointLeft = lineRenderStartLeft + ((camPos.x - (int)camPos.x) * CELLSIZE) - (CELLSIZE * i);
+
+            for (int i2 = -LINESIZE; i2 <= LINESIZE; i2++) {
+                if (LINEBLUR) {
+                    sf::Color lineColorCorrected;
+                    if (abs(i2) >= LINEBLURSTART) {
+                        lineColorCorrected = sf::Color(lineColor.r, lineColor.g, lineColor.b, 255 - min(alphaStep * (abs(i2) - LINEBLURSTART), 255.f));
+                    }
+                    else {
+                        lineColorCorrected = lineColor;
+                    }
+
+                    lines.append(sf::Vertex(sf::Vector2f(pointRight + i2, 0), lineColorCorrected));
+                    lines.append(sf::Vertex(sf::Vector2f(pointRight + i2, HEIGHT), lineColorCorrected));
+
+                    lines.append(sf::Vertex(sf::Vector2f(pointLeft + i2, 0), lineColorCorrected));
+                    lines.append(sf::Vertex(sf::Vector2f(pointLeft + i2, HEIGHT), lineColorCorrected));
+                }
+                else {
+                    lines.append(sf::Vertex(sf::Vector2f(pointRight + i2, 0), lineColor));
+                    lines.append(sf::Vertex(sf::Vector2f(pointRight + i2, HEIGHT), lineColor));
+
+                    lines.append(sf::Vertex(sf::Vector2f(pointLeft + i2, 0), lineColor));
+                    lines.append(sf::Vertex(sf::Vector2f(pointLeft + i2, HEIGHT), lineColor));
+                }
+            }
+        }
+
+        for (int i = 0; i < amountOfLinesYd; i++) {
+            int pointUp = lineRenderStartUp + ((camPos.y - (int)camPos.y) * CELLSIZE) + (CELLSIZE * i);
+            int pointDown = lineRenderStartDown + ((camPos.y - (int)camPos.y) * CELLSIZE) - (CELLSIZE * i);
+
+            for (int i2 = -LINESIZE; i2 <= LINESIZE; i2++) {
+                if (LINEBLUR) {
+                    sf::Color lineColorCorrected;
+                    if (abs(i2) >= LINEBLURSTART) {
+                        lineColorCorrected = sf::Color(lineColor.r, lineColor.g, lineColor.b, 255 - min(alphaStep * (abs(i2) - LINEBLURSTART), 255.f));
+                    }
+                    else {
+                        lineColorCorrected = lineColor;
+                    }
+
+                    lines.append(sf::Vertex(sf::Vector2f(0, pointUp + i2), lineColorCorrected));
+                    lines.append(sf::Vertex(sf::Vector2f(WIDTH, pointUp + i2), lineColorCorrected));
+
+                    lines.append(sf::Vertex(sf::Vector2f(0, pointDown + i2), lineColorCorrected));
+                    lines.append(sf::Vertex(sf::Vector2f(WIDTH, pointDown + i2), lineColorCorrected));
+                }
+                else {
+                    lines.append(sf::Vertex(sf::Vector2f(0, pointUp + i2), lineColor));
+                    lines.append(sf::Vertex(sf::Vector2f(WIDTH, pointUp + i2), lineColor));
+
+                    lines.append(sf::Vertex(sf::Vector2f(0, pointDown + i2), lineColor));
+                    lines.append(sf::Vertex(sf::Vector2f(WIDTH, pointDown + i2), lineColor));
+                }
+            }
+        }
+
+        if (isCellOnScreen(sf::Vector2i(0, 0))) {
+            sf::RectangleShape rect(sf::Vector2f(0, 0));
+
+            rect.setPosition(sf::Vector2f(hW + (camPos.x * CELLSIZE) - (CELLSIZE / 2), hH + (camPos.y * CELLSIZE) - (CELLSIZE / 2)));
+            rect.setSize(sf::Vector2f(CELLSIZE, CELLSIZE));
+            rect.setFillColor(sf::Color(0, 0, 0, 255));
+
+            window.draw(rect);
+        }
+
+        window.draw(lines);
+
+        window.display();
+    }
+
+    return 0;
+}

@@ -1,0 +1,9 @@
+{
+  "icon": "https://raw.githubusercontent.com/w1zlm/Anything/main/mod_name.png",
+  "name": "More arrows Test",
+  "author": "Interesting_persona",
+  "script": "https://raw.githubusercontent.com/w1zlm/Anything/main/sctrelki_script.js",
+  "id": "zero.astro",
+  "description": "More strelochek",
+  "xdlcversion": 2
+}
